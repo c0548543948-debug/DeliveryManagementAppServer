@@ -1,0 +1,321 @@
+# For more info on HTTP files go to https://aka.ms/vs/httpfile
+@Web_HostAddress = https://localhost:7039
+@Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ZTMwODgzOC1iOWZkLTQ4OGItOWY3MC01MzdmNWUxMjM5ZjEiLCJlbWFpbCI6IkNyY0BnbWFpbC5jb20iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJBZG1pbmlzdHJhdG9yIiwianRpIjoiZjMwYjMxZjQtMjMyZi00N2ZhLWEzYWUtYjAyYjM0YzlkNGQzIiwiZXhwIjoxNzgwMzk3Mjc1LCJpc3MiOiJEZWxpdmVyeU1hbmFnZW1lbnRBcHAiLCJhdWQiOiJEZWxpdmVyeU1hbmFnZW1lbnRBcHAifQ.Coif76PudARBNpiHV7I3xyAzQIxY6vYAIXavLOJTkD4
+
+### ==================== USERS ====================
+
+# POST Register - Administrator
+POST {{Web_HostAddress}}/api/Users/register
+Content-Type: application/json
+
+{
+  "email": "admin@delivery.com",
+  "password": "Admin1234!",
+  "role": "Administrator",
+  "firstName": "Admin",
+  "lastName": "User",
+  "phone": null
+}
+
+###
+
+# POST Register - Customer
+POST {{Web_HostAddress}}/api/Users/register
+Content-Type: application/json
+
+{
+  "email": "customer@delivery.com",
+  "password": "Customer1234!",
+  "role": "Customer",
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "050-1234567"
+}
+
+###
+
+# POST Register - Courier
+POST {{Web_HostAddress}}/api/Users/register
+Content-Type: application/json
+
+{
+  "email": "courier@delivery.com",
+  "password": "Courier1234!",
+  "role": "Courier",
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "phone": null
+}
+
+###
+
+# POST Login
+POST {{Web_HostAddress}}/api/Users/login
+Content-Type: application/json
+
+{
+  "email": "admin@delivery.com",
+  "password": "Admin1234!"
+}
+
+###
+
+### ==================== ORDERS ====================
+
+# GET All Orders
+GET {{Web_HostAddress}}/api/Orders
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Order by ID
+GET {{Web_HostAddress}}/api/Orders/1
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Validate Address
+GET {{Web_HostAddress}}/api/Orders/validate-address?address=Dizengoff 10, Tel Aviv
+Authorization: Bearer {{Token}}
+
+###
+
+# POST Calculate Price
+POST {{Web_HostAddress}}/api/Orders/calculate-price
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "Dizengoff Street, Tel Aviv",
+  "destinationAddress": "Ben Gurion Airport, Israel",
+  "weight": 5,
+  "volume": 2,
+  "requiredDate": "2025-12-01T00:00:00Z"
+}
+
+###
+
+# POST Create Order
+POST {{Web_HostAddress}}/api/Orders
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "customerId": 1,
+  "originAddress": "Dizengoff Street, Tel Aviv",
+  "destinationAddress": "Ben Gurion Airport, Israel",
+  "weight": 5,
+  "volume": 2,
+  "requiredDate": "2025-12-01T00:00:00Z"
+}
+
+###
+
+# PUT Update Order
+PUT {{Web_HostAddress}}/api/Orders/1
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "originAddress": "Dizengoff Street, Tel Aviv",
+  "destinationAddress": "Ben Gurion Airport, Israel",
+  "weight": 5,
+  "volume": 2,
+  "requiredDate": "2025-12-01T00:00:00Z",
+  "price": 55.00,
+  "status": 0
+}
+
+###
+
+# DELETE Order
+DELETE {{Web_HostAddress}}/api/Orders/1
+Authorization: Bearer {{Token}}
+
+###
+
+### ==================== CUSTOMERS ====================
+
+# GET All Customers
+GET {{Web_HostAddress}}/api/Customers
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Customer by ID
+GET {{Web_HostAddress}}/api/Customers/1
+Authorization: Bearer {{Token}}
+
+###
+
+# POST Create Customer
+POST {{Web_HostAddress}}/api/Customers
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "applicationUserId": "paste-user-id-here",
+  "phone": "050-0000000"
+}
+
+###
+
+# PUT Update Customer
+PUT {{Web_HostAddress}}/api/Customers/1
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "phone": "052-0000000"
+}
+
+###
+
+# DELETE Customer
+DELETE {{Web_HostAddress}}/api/Customers/1
+Authorization: Bearer {{Token}}
+
+###
+
+### ==================== COURIERS ====================
+
+# GET All Couriers
+GET {{Web_HostAddress}}/api/Couriers
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Courier by ID
+GET {{Web_HostAddress}}/api/Couriers/1
+Authorization: Bearer {{Token}}
+
+###
+
+# POST Create Courier
+POST {{Web_HostAddress}}/api/Couriers
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "applicationUserId": "paste-user-id-here"
+}
+
+###
+
+# PUT Update Courier
+PUT {{Web_HostAddress}}/api/Couriers/1
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "applicationUserId": "paste-user-id-here"
+}
+
+###
+
+# DELETE Courier
+DELETE {{Web_HostAddress}}/api/Couriers/1
+Authorization: Bearer {{Token}}
+
+###
+
+### ==================== VEHICLES ====================
+
+# GET All Vehicles
+GET {{Web_HostAddress}}/api/Vehicles
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Vehicle by ID
+GET {{Web_HostAddress}}/api/Vehicles/1
+Authorization: Bearer {{Token}}
+
+###
+
+# POST Create Vehicle
+POST {{Web_HostAddress}}/api/Vehicles
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "type": 0,
+  "capacityVolume": 10.0,
+  "capacityWeight": 500.0
+}
+
+###
+
+# PUT Update Vehicle
+PUT {{Web_HostAddress}}/api/Vehicles/1
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "type": 1,
+  "capacityVolume": 20.0,
+  "capacityWeight": 1000.0
+}
+
+###
+
+# DELETE Vehicle
+DELETE {{Web_HostAddress}}/api/Vehicles/1
+Authorization: Bearer {{Token}}
+
+###
+
+### ==================== ROUTES ====================
+
+# GET All Routes
+GET {{Web_HostAddress}}/api/Routes
+Authorization: Bearer {{Token}}
+
+###
+
+# GET Route by ID
+GET {{Web_HostAddress}}/api/Routes/1
+Authorization: Bearer {{Token}}
+
+###
+
+# POST Create Route
+POST {{Web_HostAddress}}/api/Routes
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "courierId": 1,
+  "vehicleId": 1,
+  "date": "2025-12-01",
+  "startTime": "08:00:00",
+  "endTime": "17:00:00"
+}
+
+###
+
+# PUT Update Route
+PUT {{Web_HostAddress}}/api/Routes/1
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "courierId": 1,
+  "vehicleId": 1,
+  "date": "2025-12-01",
+  "startTime": "09:00:00",
+  "endTime": "18:00:00"
+}
+
+###
+
+# DELETE Route
+DELETE {{Web_HostAddress}}/api/Routes/1
+Authorization: Bearer {{Token}}
+
+###

@@ -1,0 +1,33 @@
+<div class="route-map-container">
+  <div *ngIf="loading" class="text-center p-4">Loading route...</div>
+  <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
+
+  <div *ngIf="routeData">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>Route #{{ routeId }}</h4>
+      <button class="btn btn-primary" (click)="openNavigation()">
+        Open in Google Maps Navigation
+      </button>
+    </div>
+
+    <!-- Embedded Map -->
+    <div id="map" style="height: 500px; width: 100%; border-radius: 8px;"></div>
+
+    <!-- Stops List -->
+    <div class="mt-4">
+      <h5>Stops ({{ routeData.stops.length }})</h5>
+      <div class="list-group">
+        <div *ngFor="let stop of routeData.stops; let i = index"
+             class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <span class="badge bg-primary me-2">{{ i + 1 }}</span>
+            {{ stop.address }}
+          </div>
+          <small class="text-muted">
+            {{ stop.estimatedArrival ? (stop.estimatedArrival | date:'HH:mm') : 'ETA N/A' }}
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
