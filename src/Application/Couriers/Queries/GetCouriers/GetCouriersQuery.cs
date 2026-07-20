@@ -33,6 +33,7 @@ public class GetCouriersQueryHandler : IRequestHandler<GetCouriersQuery, List<Co
                 {
                     dto.FirstName = name.FirstName;
                     dto.LastName = name.LastName;
+                    dto.Email = name.Email;
                 }
             }
         }

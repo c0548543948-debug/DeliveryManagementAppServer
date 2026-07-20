@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DeliveryManagementApp.Application.Routes.Queries.GetRoutes;
 
-public record GetRoutesQuery(DateOnly? Date = null) : IRequest<List<RouteDto>>;
+public record GetRoutesQuery(DateOnly? Date = null, string? CourierUserId = null) : IRequest<List<RouteDto>>;
 
 public class GetRoutesQueryHandler : IRequestHandler<GetRoutesQuery, List<RouteDto>>
 {
@@ -29,6 +29,9 @@ public class GetRoutesQueryHandler : IRequestHandler<GetRoutesQuery, List<RouteD
 
         if (request.Date.HasValue)
             query = query.Where(r => r.Date == request.Date.Value);
+
+        if (!string.IsNullOrEmpty(request.CourierUserId))
+            query = query.Where(r => r.Courier != null && r.Courier.ApplicationUserId == request.CourierUserId);
 
         var routes = await _context.ExecuteQueryAsync(query, cancellationToken);
         var dtos = _mapper.Map<List<RouteDto>>(routes);

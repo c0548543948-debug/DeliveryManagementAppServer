@@ -93,5 +93,6 @@ public static class DependencyInjection
         builder.Services.AddTransient<IUserNameService, UserNameService>();
         builder.Services.AddTransient<ITrackingTokenService, TrackingTokenService>();
         builder.Services.AddTransient<IPricingService, PricingService>();
+        builder.Services.AddSingleton<IRouteProgressService, RouteProgressService>();
     }
 }

@@ -10,7 +10,14 @@ using DeliveryManagementApp.Application.Routes.Queries.GetRouteById;
 using DeliveryManagementApp.Application.Routes.Queries.GetRouteMapUrl;
 using DeliveryManagementApp.Application.Routes.Queries.GetRoutes;
 using DeliveryManagementApp.Application.Routes.Queries.GetRoutesByDate;
+using DeliveryManagementApp.Application.Common.Interfaces;
+using DeliveryManagementApp.Application.Routes.DTOs;
+using DeliveryManagementApp.Domain.Constants;
+using DeliveryManagementApp.Domain.Enums;
+using DeliveryManagementApp.Web.Hubs;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace DeliveryManagementApp.Web.Endpoints;
 
@@ -31,10 +38,18 @@ public class Routes : IEndpointGroup
         group.MapPost(CreateRoute);
         group.MapPut(UpdateRoute, "{id}");
         group.MapDelete(DeleteRoute, "{id}");
+        group.MapPost(StartRoute, "{id}/start")
+             .RequireAuthorization(policy => policy.RequireRole(Roles.Courier));
+        group.MapPatch(SetCurrentStop, "{id}/current-stop")
+             .RequireAuthorization(policy => policy.RequireRole(Roles.Courier));
     }
 
-    public static async Task<Ok<List<Application.Routes.DTOs.RouteDto>>> GetRoutes(ISender sender, DateOnly? date = null)
-        => TypedResults.Ok(await sender.Send(new GetRoutesQuery(date)));
+    public static async Task<Ok<List<Application.Routes.DTOs.RouteDto>>> GetRoutes(ISender sender, IUser currentUser, DateOnly? date = null)
+    {
+        // When a Courier calls this endpoint, filter to only their own routes
+        string? courierUserId = currentUser.Roles?.Contains(Roles.Courier) == true ? currentUser.Id : null;
+        return TypedResults.Ok(await sender.Send(new GetRoutesQuery(date, courierUserId)));
+    }
 
     public static async Task<Ok<List<Application.Routes.DTOs.RouteDto>>> GetRoutesByDate(ISender sender, DateOnly date)
         => TypedResults.Ok(await sender.Send(new GetRoutesByDateQuery(date)));
@@ -93,6 +108,58 @@ public class Routes : IEndpointGroup
     public static async Task<NoContent> DeleteRoute(ISender sender, int id)
     {
         await sender.Send(new DeleteRouteCommand(id));
+        return TypedResults.NoContent();
+    }
+
+    public static async Task<Results<NoContent, NotFound>> StartRoute(
+        IApplicationDbContext context,
+        IRouteProgressService progress,
+        IHubContext<TrackingHub> hub,
+        int id,
+        CancellationToken ct)
+    {
+        var routeQuery = context.Routes
+            .Include(r => r.Items).ThenInclude(i => i.Order)
+            .Where(r => r.Id == id);
+        var route = await context.ExecuteSingleAsync(routeQuery, ct);
+        if (route is null) return TypedResults.NotFound();
+
+        // Mark all orders as InTransit
+        foreach (var item in route.Items.Where(i => i.Order != null))
+            item.Order!.Status = OrderStatus.InTransit;
+        await context.SaveChangesAsync(ct);
+
+        // Start progress tracking
+        int totalStops = route.Items.Count;
+        progress.StartRoute(id, totalStops);
+
+        // Broadcast to all customers tracking orders in this route
+        var orderIds = route.Items.Select(i => i.OrderId).Distinct().ToList();
+        foreach (var orderId in orderIds)
+            await hub.Clients.Group($"order-{orderId}")
+                .SendAsync("ProgressUpdated", new { currentStop = 1, totalStops }, ct);
+
+        return TypedResults.NoContent();
+    }
+
+    public static async Task<NoContent> SetCurrentStop(
+        IApplicationDbContext context,
+        IRouteProgressService progress,
+        IHubContext<TrackingHub> hub,
+        int id,
+        int stop,
+        CancellationToken ct)
+    {
+        progress.SetCurrentStop(id, stop);
+        var p = progress.GetProgress(id);
+
+        var itemsQuery = context.RouteItems.Where(i => i.RouteId == id);
+        var items = await context.ExecuteQueryAsync(itemsQuery, ct);
+
+        foreach (var item in items)
+            await hub.Clients.Group($"order-{item.OrderId}")
+                .SendAsync("ProgressUpdated", new { currentStop = stop, totalStops = p?.TotalStops ?? 0 }, ct);
+
         return TypedResults.NoContent();
     }
 }

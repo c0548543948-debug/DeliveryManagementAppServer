@@ -15,6 +15,7 @@ public class Users : IEndpointGroup
         group.MapPost(RegisterCourier, "register-courier").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
         group.MapPost(RegisterAdmin, "register-admin").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
         group.MapPost(Login, "login");
+        group.MapPost(ResetPassword, "{userId}/reset-password").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
     }
 
     public static async Task<Results<Ok<string>, BadRequest<IEnumerable<string>>>> Register(
@@ -109,6 +110,49 @@ public class Users : IEndpointGroup
 
         var token = jwtService.GenerateToken(user.Id, user.Email!, assignedRole, user.FirstName, user.LastName);
         return TypedResults.Ok(token);
+    }
+
+    public static async Task<Results<Ok<string>, NotFound, BadRequest<IEnumerable<string>>>> ResetPassword(
+        UserManager<ApplicationUser> userManager,
+        string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null) return TypedResults.NotFound();
+
+        var newPassword = GeneratePassword();
+        var token = await userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!result.Succeeded)
+            return TypedResults.BadRequest(result.Errors.Select(e => e.Description));
+
+        return TypedResults.Ok(newPassword);
+    }
+
+    private static string GeneratePassword()
+    {
+        const string upper   = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower   = "abcdefghjkmnpqrstuvwxyz";
+        const string digits  = "23456789";
+        const string special = "!@#$%&";
+        const string all     = upper + lower + digits + special;
+
+        var rng = Random.Shared;
+        var required = new[]
+        {
+            upper  [rng.Next(upper.Length)],
+            lower  [rng.Next(lower.Length)],
+            digits [rng.Next(digits.Length)],
+            special[rng.Next(special.Length)],
+        };
+        var rest = Enumerable.Range(0, 6).Select(_ => all[rng.Next(all.Length)]);
+        var chars = required.Concat(rest).ToArray();
+        // Fisher-Yates shuffle
+        for (int i = chars.Length - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
     }
 
     public static async Task<Results<Ok<string>, UnauthorizedHttpResult>> Login(

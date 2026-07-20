@@ -11,16 +11,16 @@ public class UserNameService : IUserNameService
     public UserNameService(UserManager<ApplicationUser> userManager)
         => _userManager = userManager;
 
-    public async Task<Dictionary<string, (string FirstName, string LastName)>> GetNamesAsync(
+    public async Task<Dictionary<string, (string FirstName, string LastName, string Email)>> GetNamesAsync(
         IEnumerable<string> userIds,
         CancellationToken cancellationToken = default)
     {
         var ids = userIds.ToHashSet();
         var users = await _userManager.Users
             .Where(u => ids.Contains(u.Id))
-            .Select(u => new { u.Id, u.FirstName, u.LastName })
+            .Select(u => new { u.Id, u.FirstName, u.LastName, u.Email })
             .ToListAsync(cancellationToken);
 
-        return users.ToDictionary(u => u.Id, u => (u.FirstName, u.LastName));
+        return users.ToDictionary(u => u.Id, u => (u.FirstName, u.LastName, u.Email ?? string.Empty));
     }
 }
