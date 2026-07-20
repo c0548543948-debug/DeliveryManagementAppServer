@@ -8,6 +8,9 @@ public class Route : BaseAuditableEntity
     public TimeOnly StartTime { get; set; }
     public TimeOnly EndTime { get; set; }
 
+    /// <summary>Persisted courier position (1-based). Null = route not started.</summary>
+    public int? CurrentStop { get; set; }
+
     // Navigation
     public Courier Courier { get; set; } = null!;
     public Vehicle? Vehicle { get; set; }

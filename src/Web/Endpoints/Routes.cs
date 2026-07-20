@@ -124,20 +124,32 @@ public class Routes : IEndpointGroup
         var route = await context.ExecuteSingleAsync(routeQuery, ct);
         if (route is null) return TypedResults.NotFound();
 
-        // Mark all orders as InTransit
-        foreach (var item in route.Items.Where(i => i.Order != null))
-            item.Order!.Status = OrderStatus.InTransit;
-        await context.SaveChangesAsync(ct);
-
-        // Start progress tracking
         int totalStops = route.Items.Count;
-        progress.StartRoute(id, totalStops);
 
-        // Broadcast to all customers tracking orders in this route
-        var orderIds = route.Items.Select(i => i.OrderId).Distinct().ToList();
-        foreach (var orderId in orderIds)
-            await hub.Clients.Group($"order-{orderId}")
-                .SendAsync("ProgressUpdated", new { currentStop = 1, totalStops }, ct);
+        if (!route.CurrentStop.HasValue)
+        {
+            // First start: set orders to InTransit and set currentStop = 1
+            foreach (var item in route.Items.Where(i => i.Order != null))
+                item.Order!.Status = OrderStatus.InTransit;
+            route.CurrentStop = 1;
+            await context.SaveChangesAsync(ct);
+
+            // Warm in-memory and broadcast
+            progress.StartRoute(id, totalStops);
+            var orderIds = route.Items.Select(i => i.OrderId).Distinct().ToList();
+            foreach (var orderId in orderIds)
+                await hub.Clients.Group($"order-{orderId}")
+                    .SendAsync("ProgressUpdated", new { currentStop = 1, totalStops }, ct);
+        }
+        else
+        {
+            // Already started (e.g., server restart cleared in-memory) — restore in-memory only
+            if (!progress.GetProgress(id).HasValue)
+            {
+                progress.StartRoute(id, totalStops);
+                progress.SetCurrentStop(id, route.CurrentStop.Value);
+            }
+        }
 
         return TypedResults.NoContent();
     }
@@ -150,15 +162,25 @@ public class Routes : IEndpointGroup
         int stop,
         CancellationToken ct)
     {
+        // Persist to DB
+        var route = await context.ExecuteSingleAsync(context.Routes.Where(r => r.Id == id), ct);
+        if (route is not null)
+        {
+            route.CurrentStop = stop;
+            await context.SaveChangesAsync(ct);
+        }
+
+        // Mirror to in-memory
         progress.SetCurrentStop(id, stop);
         var p = progress.GetProgress(id);
 
         var itemsQuery = context.RouteItems.Where(i => i.RouteId == id);
         var items = await context.ExecuteQueryAsync(itemsQuery, ct);
 
+        int totalStops = p?.TotalStops ?? items.Count;
         foreach (var item in items)
             await hub.Clients.Group($"order-{item.OrderId}")
-                .SendAsync("ProgressUpdated", new { currentStop = stop, totalStops = p?.TotalStops ?? 0 }, ct);
+                .SendAsync("ProgressUpdated", new { currentStop = stop, totalStops }, ct);
 
         return TypedResults.NoContent();
     }

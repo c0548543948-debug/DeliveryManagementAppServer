@@ -72,11 +72,24 @@ public class ApplicationDbContextInitialiser
         }
 
         // Default admin user
-        var administrator = new ApplicationUser { UserName = "administrator@localhost", Email = "administrator@localhost" };
-        if (_userManager.Users.All(u => u.UserName != administrator.UserName))
+        var administrator = new ApplicationUser
+        {
+            UserName = "administrator@localhost",
+            Email = "administrator@localhost",
+            FirstName = "System",
+            LastName = "Administrator"
+        };
+        var existingAdmin = await _userManager.FindByNameAsync(administrator.UserName);
+        if (existingAdmin == null)
         {
             await _userManager.CreateAsync(administrator, "Administrator1!");
             await _userManager.AddToRoleAsync(administrator, Roles.Administrator);
+        }
+        else if (string.IsNullOrEmpty(existingAdmin.FirstName))
+        {
+            existingAdmin.FirstName = "System";
+            existingAdmin.LastName = "Administrator";
+            await _userManager.UpdateAsync(existingAdmin);
         }
     }
 }

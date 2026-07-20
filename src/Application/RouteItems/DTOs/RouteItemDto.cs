@@ -19,4 +19,5 @@ public class RouteItemDto
     // פרטי ההזמנה לתצוגה
     public string OriginAddress { get; set; } = string.Empty;
     public string DestinationAddress { get; set; } = string.Empty;
+    public OrderStatus OrderStatus { get; set; }
 }

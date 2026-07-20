@@ -10,6 +10,7 @@ public class RouteDto
     public DateOnly Date { get; set; }
     public TimeOnly StartTime { get; set; }
     public TimeOnly EndTime { get; set; }
+    public int? CurrentStop { get; set; }
     public List<RouteItemDto> Items { get; set; } = new();
 
     // Display fields — populated by the query handler

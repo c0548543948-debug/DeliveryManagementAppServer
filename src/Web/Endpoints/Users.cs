@@ -15,6 +15,8 @@ public class Users : IEndpointGroup
         group.MapPost(RegisterCourier, "register-courier").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
         group.MapPost(RegisterAdmin, "register-admin").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
         group.MapPost(Login, "login");
+        group.MapPost(Refresh, "refresh").RequireAuthorization();
+        group.MapPatch(UpdateProfile, "me").RequireAuthorization();
         group.MapPost(ResetPassword, "{userId}/reset-password").RequireAuthorization(policy => policy.RequireRole(Roles.Administrator));
     }
 
@@ -112,6 +114,27 @@ public class Users : IEndpointGroup
         return TypedResults.Ok(token);
     }
 
+    /// <summary>PATCH /api/Users/me — update own first/last name, returns a fresh JWT.</summary>
+    public static async Task<Results<Ok<string>, UnauthorizedHttpResult>> UpdateProfile(
+        UserManager<ApplicationUser> userManager,
+        IJwtService jwtService,
+        IUser currentUser,
+        UpdateProfileRequest request)
+    {
+        if (currentUser.Id is null) return TypedResults.Unauthorized();
+        var user = await userManager.FindByIdAsync(currentUser.Id);
+        if (user is null) return TypedResults.Unauthorized();
+
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        await userManager.UpdateAsync(user);
+
+        var roles = await userManager.GetRolesAsync(user);
+        var role = roles.FirstOrDefault() ?? string.Empty;
+        var token = jwtService.GenerateToken(user.Id, user.Email!, role, user.FirstName, user.LastName);
+        return TypedResults.Ok(token);
+    }
+
     public static async Task<Results<Ok<string>, NotFound, BadRequest<IEnumerable<string>>>> ResetPassword(
         UserManager<ApplicationUser> userManager,
         string userId)
@@ -155,6 +178,22 @@ public class Users : IEndpointGroup
         return new string(chars);
     }
 
+    /// <summary>POST /api/Users/refresh — exchange a valid token for a fresh one.</summary>
+    public static async Task<Results<Ok<string>, UnauthorizedHttpResult>> Refresh(
+        UserManager<ApplicationUser> userManager,
+        IJwtService jwtService,
+        IUser currentUser)
+    {
+        if (currentUser.Id is null) return TypedResults.Unauthorized();
+        var user = await userManager.FindByIdAsync(currentUser.Id);
+        if (user is null) return TypedResults.Unauthorized();
+
+        var roles = await userManager.GetRolesAsync(user);
+        var role = roles.FirstOrDefault() ?? string.Empty;
+        var token = jwtService.GenerateToken(user.Id, user.Email!, role, user.FirstName, user.LastName);
+        return TypedResults.Ok(token);
+    }
+
     public static async Task<Results<Ok<string>, UnauthorizedHttpResult>> Login(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -176,3 +215,4 @@ public class Users : IEndpointGroup
 
 public record RegisterRequest(string Email, string Password, string Role, string FirstName, string LastName, string? Phone);
 public record LoginRequest(string Email, string Password);
+public record UpdateProfileRequest(string FirstName, string LastName);

@@ -5,6 +5,7 @@ using DeliveryManagementApp.Domain.Enums;
 using DeliveryManagementApp.Web.Hubs;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace DeliveryManagementApp.Web.Endpoints;
 
@@ -53,15 +54,47 @@ public class Tracking : IEndpointGroup
         int? pickupStop = items.FirstOrDefault(i => i.StopType == StopType.Pickup)?.StopOrder;
         int? deliveryStop = items.FirstOrDefault(i => i.StopType == StopType.Delivery)?.StopOrder;
 
-        var p = routeId.HasValue ? progress.GetProgress(routeId.Value) : null;
+        // Try in-memory first (fast); fall back to DB (survives restarts)
+        int? currentStop = null;
+        int? totalStops = null;
+
+        if (routeId.HasValue)
+        {
+            var mem = progress.GetProgress(routeId.Value);
+            if (mem.HasValue)
+            {
+                currentStop = mem.Value.CurrentStop;
+                totalStops  = mem.Value.TotalStops;
+            }
+            else
+            {
+                // In-memory is empty (server restarted) — read from DB
+                var routeQuery = context.Routes
+                    .Include(r => r.Items)
+                    .Where(r => r.Id == routeId.Value);
+                var route = await context.ExecuteSingleAsync(routeQuery, ct);
+                if (route is not null)
+                {
+                    currentStop = route.CurrentStop;          // null if not started
+                    totalStops  = route.Items.Count > 0 ? route.Items.Count : null;
+
+                    // Warm the in-memory cache if the route has started
+                    if (currentStop.HasValue && totalStops.HasValue)
+                    {
+                        progress.StartRoute(routeId.Value, totalStops.Value);
+                        progress.SetCurrentStop(routeId.Value, currentStop.Value);
+                    }
+                }
+            }
+        }
 
         return TypedResults.Ok(new OrderProgressDto
         {
-            PickupStop = pickupStop,
+            PickupStop   = pickupStop,
             DeliveryStop = deliveryStop,
-            CurrentStop = p?.CurrentStop,
-            TotalStops = p?.TotalStops,
-            RouteId = routeId
+            CurrentStop  = currentStop,
+            TotalStops   = totalStops,
+            RouteId      = routeId
         });
     }
 

@@ -1,3 +1,4 @@
+using DeliveryManagementApp.Application.Common.Interfaces;
 using DeliveryManagementApp.Application.Orders.Commands.CreateOrder;
 using DeliveryManagementApp.Application.Orders.Commands.DeleteOrder;
 using DeliveryManagementApp.Application.Orders.Commands.UpdateOrder;
@@ -7,8 +8,12 @@ using DeliveryManagementApp.Application.Orders.Queries.GetOrderById;
 using DeliveryManagementApp.Application.Orders.Queries.GetOrders;
 using DeliveryManagementApp.Application.Orders.Queries.GetPendingOrders;
 using DeliveryManagementApp.Application.Orders.Queries.ValidateAddress;
+using DeliveryManagementApp.Domain.Enums;
+using DeliveryManagementApp.Web.Hubs;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace DeliveryManagementApp.Web.Endpoints;
 
@@ -60,9 +65,50 @@ public class Orders : IEndpointGroup
         return TypedResults.NoContent();
     }
 
-    public static async Task<Results<NoContent, BadRequest>> UpdateOrderStatus(ISender sender, int id, UpdateOrderStatusRequest request)
+    public static async Task<Results<NoContent, BadRequest>> UpdateOrderStatus(
+        ISender sender,
+        IApplicationDbContext context,
+        IRouteProgressService progress,
+        IHubContext<TrackingHub> hub,
+        int id,
+        UpdateOrderStatusRequest request,
+        CancellationToken ct)
     {
         await sender.Send(new UpdateOrderStatusCommand(id, request.Status));
+
+        // Auto-start the route on first InTransit status if not already started
+        if (request.Status == OrderStatus.InTransit)
+        {
+            var routeItemQuery = context.RouteItems.Where(i => i.OrderId == id);
+            var routeItem = await context.ExecuteSingleAsync(routeItemQuery, ct);
+
+            if (routeItem != null)
+            {
+                var routeQuery = context.Routes
+                    .Include(r => r.Items)
+                    .Where(r => r.Id == routeItem.RouteId);
+                var route = await context.ExecuteSingleAsync(routeQuery, ct);
+
+                if (route != null && !route.CurrentStop.HasValue)
+                {
+                    route.CurrentStop = 1;
+                    await context.SaveChangesAsync(ct);
+                    progress.StartRoute(route.Id, route.Items.Count);
+
+                    var orderIds = route.Items.Select(i => i.OrderId).Distinct().ToList();
+                    foreach (var oid in orderIds)
+                        await hub.Clients.Group($"order-{oid}")
+                            .SendAsync("ProgressUpdated", new { currentStop = 1, totalStops = route.Items.Count }, ct);
+                }
+                else if (route != null && !progress.GetProgress(route.Id).HasValue)
+                {
+                    // Route already started in DB but not in memory — warm the cache
+                    progress.StartRoute(route.Id, route.Items.Count);
+                    progress.SetCurrentStop(route.Id, route.CurrentStop!.Value);
+                }
+            }
+        }
+
         return TypedResults.NoContent();
     }
 
