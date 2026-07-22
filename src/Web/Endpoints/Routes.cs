@@ -128,7 +128,7 @@ public class Routes : IEndpointGroup
 
         if (!route.CurrentStop.HasValue)
         {
-            // First start: set orders to InTransit and set currentStop = 1
+            // First start: set all orders InTransit so customers can track, and set currentStop = 1
             foreach (var item in route.Items.Where(i => i.Order != null))
                 item.Order!.Status = OrderStatus.InTransit;
             route.CurrentStop = 1;
