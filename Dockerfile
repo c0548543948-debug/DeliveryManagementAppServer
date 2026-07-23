@@ -12,6 +12,7 @@ COPY src/Domain/Domain.csproj                     src/Domain/
 COPY src/Application/Application.csproj           src/Application/
 COPY src/Infrastructure/Infrastructure.csproj     src/Infrastructure/
 COPY src/ServiceDefaults/ServiceDefaults.csproj   src/ServiceDefaults/
+COPY src/Shared/Shared.csproj                     src/Shared/
 COPY src/Web/Web.csproj                           src/Web/
 
 RUN dotnet restore src/Web/Web.csproj
