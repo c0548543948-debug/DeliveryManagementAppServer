@@ -96,13 +96,39 @@ SignalR Hub: `ws://localhost:PORT/hubs/tracking`
 
 ## הפעלה
 
+### הפעלה מקומית
+
+**דרישות מקדמיות:**
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- SQL Server או [LocalDB](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/sql-server-express-localdb) (מגיע עם Visual Studio)
+
 ```bash
-cd delivery-management-server
 dotnet run --project src/Web
 ```
 
 בהפעלה ראשונה (Development) בסיס הנתונים נוצר אוטומטית ומאוכלס בנתוני ברירת מחדל:
 - משתמש מנהל: `administrator@localhost` / `Administrator1!`
+
+### הפעלה עם Docker
+
+```bash
+# בנייה
+docker build -t delivery-server .
+
+# הרצה
+docker run -p 8080:8080 \
+  -e ConnectionStrings__DeliveryManagementAppDb="Server=host.docker.internal;Database=DeliveryManagementDb;User Id=sa;Password=..." \
+  -e JwtSettings__Secret="your-secret-key-at-least-32-characters" \
+  -e JwtSettings__Issuer="DeliveryManagementApp" \
+  -e JwtSettings__Audience="DeliveryManagementApp" \
+  -e GoogleMaps__ApiKey="YOUR_GOOGLE_CLOUD_API_KEY" \
+  delivery-server
+```
+
+האפליקציה תהיה זמינה על `http://localhost:8080`.
+
+> משתני הסביבה (env variables) עוקפים את `appsettings.json` — מפריד בין שכבות הוא `__` (קו תחתון כפול) במקום `:`.
+> לדוגמה: `JwtSettings:Secret` → `JwtSettings__Secret`.
 
 ## סטטוסי הזמנה
 
