@@ -24,7 +24,8 @@ COPY src/ src/
 RUN dotnet publish src/Web/Web.csproj \
     --no-restore \
     -c Release \
-    -o /app/publish
+    -o /app/publish \
+    /p:SkipSpaPublish=true
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
