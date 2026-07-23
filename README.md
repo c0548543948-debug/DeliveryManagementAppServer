@@ -1,57 +1,117 @@
-﻿# DeliveryManagementApp
+# Delivery Management System — Server
 
-The project was generated using the [Clean.Architecture.Solution.Template](https://github.com/jasontaylordev/CleanArchitecture) version 10.8.0.
+ASP.NET Core Web API לניהול מערכת משלוחים. מספק REST API ו-SignalR לאפליקציית Angular.
 
-## Build
+## טכנולוגיות
 
-Run `dotnet build` to build the solution.
+- **ASP.NET Core** — Minimal APIs
+- **Entity Framework Core** — גישה לבסיס נתונים
+- **SQL Server** — בסיס הנתונים
+- **ASP.NET Identity** — ניהול משתמשים והרשאות
+- **JWT** — אימות (Authentication)
+- **SignalR** — תקשורת בזמן אמת (מיקום שליח)
+- **MediatR** — CQRS pattern (Commands & Queries)
+- **AutoMapper** — המרת entities ל-DTOs
+- **Google Cloud Route Optimization API** — אופטימיזציה של מסלולים
 
-## Run
+## מבנה הפרויקט
 
-To run the application:
+```
+src/
+├── Domain/          # Entities, Enums (Order, Route, Courier, Vehicle...)
+├── Application/     # Commands, Queries, DTOs, Interfaces (CQRS)
+├── Infrastructure/  # EF Core, Services (JWT, RouteOptimization, ...)
+└── Web/             # Endpoints, Hubs, Program.cs
+```
+
+הפרויקט בנוי על ארכיטקטורת **Clean Architecture**:
+- `Domain` לא תלוי בשום שכבה אחרת
+- `Application` מגדיר interfaces, `Infrastructure` מממש אותם
+- `Web` הוא נקודת הכניסה
+
+## תפקידי משתמשים
+
+| תפקיד | הרשאות |
+|-------|--------|
+| `Administrator` | ניהול כל המערכת — הזמנות, שליחים, רכבים, מסלולים |
+| `Courier` | צפייה במסלולים שלו, עדכון מיקום, עדכון סטטוס עצירות |
+| `Customer` | יצירת הזמנות, מעקב אחר הזמנה בזמן אמת |
+
+## Endpoints עיקריים
+
+### אימות
+```
+POST /api/Users/login          התחברות — מחזיר JWT
+POST /api/Users/register       הרשמה
+POST /api/Users/refresh        רענון טוקן
+PATCH /api/Users/me            עדכון שם פרטי/משפחה
+```
+
+### הזמנות
+```
+GET    /api/Orders             רשימת הזמנות (עם פילטור תאריך/סטטוס)
+POST   /api/Orders             יצירת הזמנה חדשה
+PATCH  /api/Orders/{id}/status עדכון סטטוס הזמנה
+POST   /api/Orders/validate-address   אימות כתובת
+POST   /api/Orders/calculate-price    חישוב מחיר
+```
+
+### מסלולים
+```
+GET    /api/Routes             רשימת מסלולים
+POST   /api/Routes/create-optimized   יצירת מסלול אופטימלי
+POST   /api/Routes/{id}/start  התחלת מסלול (שליח)
+PATCH  /api/Routes/{id}/current-stop  עדכון עצירה נוכחית
+```
+
+### מעקב
+```
+POST   /api/Tracking/{orderId}/location   שליחת מיקום GPS
+GET    /api/Tracking/{orderId}/progress   התקדמות מסלול
+```
+SignalR Hub: `ws://localhost:PORT/hubs/tracking`
+
+## הגדרת סביבה
+
+צור קובץ `src/Web/appsettings.Development.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DeliveryManagementAppDb": "Server=(localdb)\\mssqllocaldb;Database=DeliveryManagementDb;Trusted_Connection=True;"
+  },
+  "JwtSettings": {
+    "Secret": "your-secret-key-at-least-32-characters",
+    "ExpiryMinutes": 43200,
+    "Issuer": "DeliveryManagementApp",
+    "Audience": "DeliveryManagementApp"
+  },
+  "GoogleMaps": {
+    "ApiKey": "YOUR_GOOGLE_CLOUD_API_KEY"
+  }
+}
+```
+
+> ללא `GoogleMaps:ApiKey` המערכת עובדת עם fallback — חלוקת הזמנות פשוטה ללא אופטימיזציה גיאוגרפית.
+
+## הפעלה
 
 ```bash
-dotnet run --project .\src\AppHost
+cd delivery-management-server
+dotnet run --project src/Web
 ```
 
-The Aspire dashboard will open automatically, showing the application URLs and logs.
+בהפעלה ראשונה (Development) בסיס הנתונים נוצר אוטומטית ומאוכלס בנתוני ברירת מחדל:
+- משתמש מנהל: `administrator@localhost` / `Administrator1!`
 
-## Code Styles & Formatting
-
-The template includes [EditorConfig](https://editorconfig.org/) support to help maintain consistent coding styles for multiple developers working on the same project across various editors and IDEs. The **.editorconfig** file defines the coding styles applicable to this solution.
-
-## Code Scaffolding
-
-The template includes support to scaffold new commands and queries.
-
-Start in the `.\src\Application\` folder.
-
-Create a new command:
+## סטטוסי הזמנה
 
 ```
-dotnet new ca-usecase --name CreateTodoList --feature-name TodoLists --usecase-type command --return-type int
+Pending → Assigned → InTransit → Delivered
+                              ↘ Cancelled
 ```
 
-Create a new query:
-
-```
-dotnet new ca-usecase -n GetTodos -fn TodoLists -ut query -rt TodosVm
-```
-
-If you encounter the error *"No templates or subcommands found matching: 'ca-usecase'."*, install the template and try again:
-
-```bash
-dotnet new install Clean.Architecture.Solution.Template::10.8.0
-```
-
-## Test
-
-The solution contains unit, integration, and functional tests.
-
-To run the tests:
-```bash
-dotnet test
-```
-
-## Help
-To learn more about the template go to the [project website](https://cleanarchitecture.jasontaylor.dev). Here you can find additional guidance, request new features, report a bug, and discuss the template with other users.
+- `Pending` — הוזמנה, טרם שובצה למסלול
+- `Assigned` — שובצה למסלול
+- `InTransit` — השליח יצא לדרך
+- `Delivered` — נמסרה ללקוח
