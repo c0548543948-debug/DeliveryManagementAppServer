@@ -2,6 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Copy solution-level config (TargetFramework + package versions defined here)
+COPY Directory.Build.props .
+COPY Directory.Packages.props .
+COPY global.json .
+
 # Copy all csproj files and restore (layer cache)
 COPY src/Domain/Domain.csproj                     src/Domain/
 COPY src/Application/Application.csproj           src/Application/
